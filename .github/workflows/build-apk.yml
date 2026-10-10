@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,32 +26,27 @@ jobs:
           fi
           mkdir unpacked
           unzip -q "$ZIP_FILE" -d unpacked
-          echo "Extracted files:"
-          find unpacked -maxdepth 4 -type f | head -80
+          find unpacked -maxdepth 5 -type f | head -80
 
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17' 
-    
-     
-    
+          java-version: '17'
+
       - name: Set up Android SDK
-      - name: Configure Android SDK
-        run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+        uses: android-actions/setup-android@v3
+
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Locate Gradle project
         run: |
-          find unpacked -name settings.gradle -o -name settings.gradle.kts
+          find unpacked \( -name settings.gradle -o -name settings.gradle.kts \) -print
 
       - name: Build APK
         run: |
-          PROJECT_DIR=$(dirname "$(find unpacked -name settings.gradle -o -name settings.gradle.kts | head -1)")
+          PROJECT_DIR=$(dirname "$(find unpacked \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)")
           if [ -z "$PROJECT_DIR" ] || [ "$PROJECT_DIR" = "." ]; then
             echo "Gradle project not found in ZIP"
             exit 1
