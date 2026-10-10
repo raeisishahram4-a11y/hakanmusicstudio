@@ -27,9 +27,10 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses || true
+          sdkmanager --licenses
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
-          - name: Extract project ZIP
+
+      - name: Extract project ZIP
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)
           if [ -z "$ZIP_FILE" ]; then
@@ -38,29 +39,30 @@ jobs:
           fi
           mkdir -p unpacked
           unzip -oq "$ZIP_FILE" -d unpacked
-          echo "ZIP extracted successfully"
+          echo "Extracted project files:"
           find unpacked -maxdepth 5 -type f | head -80
 
       - name: Locate Gradle project
         id: project
         shell: bash
         run: |
-          PROJECT_FILE=$(find . -path './.git' -prune -o -path './.github' -prune -o \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
+          PROJECT_FILE=$(find unpacked \( -name settings.gradle -o -name settings.gradle.kts \) -type f -print -quit)
           if [ -z "$PROJECT_FILE" ]; then
-            echo "Gradle settings file not found"
-            find . -maxdepth 4 -type f | head -100
+            echo "Gradle settings file not found in ZIP"
+            find unpacked -maxdepth 6 -type f | head -100
             exit 1
           fi
           PROJECT_DIR=$(dirname "$PROJECT_FILE")
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
-          echo "Project directory: $PROJECT_DIR"
+          echo "Found project at: $PROJECT_DIR"
 
-      - name: Fix Java target compatibility
+      - name: Fix Java and Kotlin targets
         env:
           PROJECT_DIR: ${{ steps.project.outputs.dir }}
         run: |
           python3 - <<'PY'
           import os
+          import re
           from pathlib import Path
 
           root = Path(os.environ["PROJECT_DIR"])
@@ -70,12 +72,14 @@ jobs:
           for path in files:
               text = path.read_text()
               text = text.replace("VERSION_1_8", "VERSION_17")
-              text = text.replace('VERSION_1_8', 'VERSION_17')
+              text = re.sub(
+                  r'(jvmTarget\s*=\s*)["\']1\.8["\']',
+                  r'\1"17"',
+                  text
+              )
+              text = text.replace("JvmTarget.JVM_1_8", "JvmTarget.JVM_17")
               path.write_text(text)
               print("Checked:", path)
-
-          if not files:
-              print("No app Gradle build file found; continuing.")
           PY
 
       - name: Build APK
@@ -89,6 +93,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Hakan-Music-Studio-debug-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: unpacked/**/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
