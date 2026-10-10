@@ -29,6 +29,17 @@ jobs:
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          - name: Extract project ZIP
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found"
+            exit 1
+          fi
+          mkdir -p unpacked
+          unzip -oq "$ZIP_FILE" -d unpacked
+          echo "ZIP extracted successfully"
+          find unpacked -maxdepth 5 -type f | head -80
 
       - name: Locate Gradle project
         id: project
